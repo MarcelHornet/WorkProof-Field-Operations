@@ -1,0 +1,30 @@
+create or replace function public.bootstrap_first_owner(p_organisation_name text default 'Albert Operations') returns uuid language plpgsql security definer set search_path='' as $$
+declare v_org uuid;
+begin
+ if (select auth.uid()) is null then raise exception 'Authentication required'; end if;
+ if exists(select 1 from public.organisations) then raise exception 'WorkProof has already been initialised'; end if;
+ insert into public.organisations(name,slug,created_by) values(p_organisation_name,'albert-operations',(select auth.uid())) returning id into v_org;
+ insert into public.organisation_members(organisation_id,user_id,role) values(v_org,(select auth.uid()),'owner');
+ insert into public.businesses(organisation_id,name) values(v_org,'AutoCity Group'),(v_org,'De Pecan Valley'),(v_org,'Property Portfolio'),(v_org,'Construction Operations');
+ insert into public.sites(organisation_id,name) values(v_org,'AutoCity Heidelberg'),(v_org,'De Pecan Valley'),(v_org,'Grill King Building');
+ insert into public.teams(organisation_id,name,description) values(v_org,'Construction Team 1','Primary construction and maintenance team');
+ return v_org;
+end $$;
+revoke all on function public.bootstrap_first_owner(text) from public,anon;
+grant execute on function public.bootstrap_first_owner(text) to authenticated;
+create index organisation_members_user_idx on public.organisation_members(user_id);
+create index organisations_created_by_idx on public.organisations(created_by);
+create index sites_business_idx on public.sites(business_id);
+create index projects_org_site_idx on public.projects(organisation_id,site_id);
+create index task_events_task_org_idx on public.task_events(task_id,organisation_id);
+create index task_events_actor_idx on public.task_events(actor_id);
+create index task_evidence_task_org_idx on public.task_evidence(task_id,organisation_id);
+create index task_evidence_uploader_idx on public.task_evidence(uploaded_by);
+create index tasks_created_by_idx on public.tasks(created_by);
+create index tasks_org_assignee_idx on public.tasks(organisation_id,assignee_id);
+create index tasks_org_manager_idx on public.tasks(organisation_id,manager_id);
+create index tasks_project_org_idx on public.tasks(project_id,organisation_id);
+create index tasks_site_org_idx on public.tasks(site_id,organisation_id);
+create index tasks_team_org_idx on public.tasks(team_id,organisation_id);
+create index team_members_org_user_idx on public.team_members(organisation_id,user_id);
+revoke all on function public.rls_auto_enable() from public,anon,authenticated;

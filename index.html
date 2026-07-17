@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="description" content="WorkProof field operations and task verification platform." />
+  <title>WorkProof | Field Operations</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+  <div id="toast-root" class="toast-root" aria-live="polite"></div>
+
+  <section id="login-view" class="login-view">
+    <div class="login-art">
+      <div class="login-art-overlay"></div>
+      <div class="login-brand">
+        <div class="brand-mark brand-mark-large">W</div>
+        <div>
+          <div class="eyebrow light">FIELD OPERATIONS PLATFORM</div>
+          <h1>Assign work.<br />Verify execution.<br />Stay in control.</h1>
+          <p>One operating view across AutoCity, De Pecan Valley, properties and construction teams.</p>
+        </div>
+      </div>
+      <div class="proof-strip">
+        <div><strong>Live</strong><span>task visibility</span></div>
+        <div><strong>Photo</strong><span>proof of work</span></div>
+        <div><strong>Clear</strong><span>accountability</span></div>
+      </div>
+    </div>
+
+    <div class="login-panel">
+      <div class="mobile-login-brand">
+        <div class="brand-mark">W</div>
+        <div><strong>WorkProof</strong><span>Field Operations</span></div>
+      </div>
+      <div class="login-card">
+        <div class="eyebrow">SECURE WORKSPACE</div>
+        <h2>Welcome back</h2>
+        <p>Select your account, then enter your password.</p>
+
+        <form id="login-form" class="stack">
+          <div class="form-group">
+            <label for="login-account">Who is signing in?</label>
+            <select id="login-account" class="input" required>
+              <option value="">Select your name</option>
+              <option value="__other__">First time on this device</option>
+            </select>
+          </div>
+          <div id="login-identifier-group" class="form-group hidden">
+            <label for="login-identifier">Username or cellphone number</label>
+            <input id="login-identifier" name="identifier" class="input" autocomplete="username" placeholder="e.g. marcel.horne" />
+          </div>
+          <div id="login-password-group" class="form-group hidden">
+            <label for="login-password">Password</label>
+            <input id="login-password" name="password" type="password" class="input" autocomplete="current-password" minlength="8" required />
+          </div>
+
+          <button id="login-btn" class="btn btn-primary btn-full" type="submit">
+            Enter workspace
+            <span aria-hidden="true">→</span>
+          </button>
+        </form>
+
+        <div class="login-note">
+          <span class="status-dot"></span>
+          Secure access managed by WorkProof.
+        </div>
+      </div>
+      <div class="login-footer">© 2026 WorkProof · Founding client pilot</div>
+    </div>
+  </section>
+
+  <div id="app-view" class="app-view hidden">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark">W</div>
+        <div><strong>WorkProof</strong><span>Field Operations</span></div>
+      </div>
+
+      <nav id="main-nav" class="main-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-page="dashboard"><span data-icon="dashboard"></span><span>Dashboard</span></button>
+        <button class="nav-item" data-page="tasks"><span data-icon="tasks"></span><span>Tasks</span><em id="nav-task-count">0</em></button>
+        <button class="nav-item" data-page="projects"><span data-icon="projects"></span><span>Projects</span></button>
+        <button class="nav-item" data-page="sites"><span data-icon="sites"></span><span>Sites</span></button>
+        <button class="nav-item" data-page="teams"><span data-icon="teams"></span><span>Teams</span></button>
+        <button class="nav-item" data-page="reports"><span data-icon="reports"></span><span>Reports</span></button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="nav-item" data-page="settings"><span data-icon="settings"></span><span>Settings</span></button>
+        <div class="signed-in-card">
+          <div class="avatar" id="sidebar-avatar">OA</div>
+          <div class="signed-in-copy"><strong id="sidebar-name">Oom Albert</strong><span id="sidebar-role">Owner</span></div>
+          <button id="logout-btn" class="icon-btn subtle" title="Sign out" aria-label="Sign out"><span data-icon="logout"></span></button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-shell">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="mobile-menu-btn" class="icon-btn mobile-only" aria-label="Open menu"><span data-icon="menu"></span></button>
+          <div>
+            <div class="eyebrow" id="page-eyebrow">OPERATIONS OVERVIEW</div>
+            <h1 id="page-title">Dashboard</h1>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button id="global-search-btn" class="icon-btn" title="Search" aria-label="Search"><span data-icon="search"></span></button>
+          <button id="notification-btn" class="icon-btn notification-btn" title="Notifications" aria-label="Notifications"><span data-icon="bell"></span><span class="notification-badge">3</span></button>
+          <button id="create-task-btn" class="btn btn-primary"><span data-icon="plus"></span><span>New task</span></button>
+        </div>
+      </header>
+
+      <section id="page-content" class="page-content"></section>
+    </main>
+
+    <nav id="bottom-nav" class="bottom-nav" aria-label="Mobile navigation">
+      <button class="bottom-nav-item active" data-page="dashboard"><span data-icon="dashboard"></span><small>Home</small></button>
+      <button class="bottom-nav-item" data-page="tasks"><span data-icon="tasks"></span><small>Tasks</small></button>
+      <button id="bottom-create-task" class="bottom-create" aria-label="Create task"><span data-icon="plus"></span></button>
+      <button class="bottom-nav-item" data-page="teams"><span data-icon="teams"></span><small>Teams</small></button>
+      <button class="bottom-nav-item" data-page="reports"><span data-icon="reports"></span><small>Reports</small></button>
+    </nav>
+  </div>
+
+  <div id="modal-root"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
