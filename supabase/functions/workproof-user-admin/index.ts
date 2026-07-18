@@ -31,6 +31,27 @@ Deno.serve(async (req) => {
       if (!fullName || username.length < 3 || password.length < 8) return reply({ error: "Full name, unique username and an 8-character password are required." }, 400);
       if (!["owner", "manager", "team_lead", "worker"].includes(role)) return reply({ error: "Invalid role" }, 400);
       if (caller.role === "manager" && ["owner","manager"].includes(role)) return reply({ error: "Only owners can create owners or managers." }, 403);
+      const { data: existingProfile, error: existingProfileError } = await admin.from("profiles").select("id").eq("username", username).maybeSingle();
+      if (existingProfileError) return reply({ error: existingProfileError.message }, 400);
+      if (existingProfile) {
+        const { data: existingMemberships, error: existingMembershipError } = await admin.from("organisation_members").select("organisation_id").eq("user_id", existingProfile.id);
+        if (existingMembershipError) return reply({ error: existingMembershipError.message }, 400);
+        if ((existingMemberships || []).length) return reply({ error: "This username already belongs to a WorkProof organisation." }, 409);
+        const { error: recoverAuthError } = await admin.auth.admin.updateUserById(existingProfile.id, {
+          password,
+          user_metadata: { full_name: fullName, username, phone: body.phone || null, title: body.title || null, must_change_password: true },
+          app_metadata: { organisation_id: caller.organisation_id, role },
+        });
+        if (recoverAuthError) return reply({ error: recoverAuthError.message }, 400);
+        const { error: recoverProfileError } = await admin.from("profiles").update({ username, full_name: fullName, phone: body.phone || null, title: body.title || null, active: true, must_change_password: true, revoked_at: null }).eq("id", existingProfile.id);
+        const { error: recoverMemberError } = await admin.from("organisation_members").insert({ organisation_id: caller.organisation_id, user_id: existingProfile.id, role, active: true });
+        if (recoverProfileError || recoverMemberError) return reply({ error: recoverProfileError?.message || recoverMemberError?.message }, 400);
+        if (body.team_id) {
+          const { error: recoverTeamError } = await admin.from("team_members").upsert({ organisation_id: caller.organisation_id, team_id: body.team_id, user_id: existingProfile.id, is_lead: role === "team_lead" });
+          if (recoverTeamError) return reply({ error: recoverTeamError.message }, 400);
+        }
+        return reply({ user_id: existingProfile.id, username, recovered: true });
+      }
       const syntheticEmail = `${username}@users.workproof.app`;
       const { data: created, error: createError } = await admin.auth.admin.createUser({ email: syntheticEmail, password, email_confirm: true, user_metadata: { full_name: fullName, username, phone: body.phone || null, title: body.title || null, must_change_password: true }, app_metadata: { organisation_id: caller.organisation_id, role } });
       if (createError || !created.user) return reply({ error: createError?.message || "Could not create user" }, 400);
