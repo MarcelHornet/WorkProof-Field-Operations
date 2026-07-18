@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
       if (!fullName || username.length < 3 || password.length < 8) return reply({ error: "Full name, unique username and an 8-character password are required." }, 400);
       if (!["owner", "manager", "team_lead", "worker"].includes(role)) return reply({ error: "Invalid role" }, 400);
       if (caller.role === "manager" && ["owner","manager"].includes(role)) return reply({ error: "Only owners can create owners or managers." }, 403);
-      const syntheticEmail = `${username}@users.workproof.internal`;
+      const syntheticEmail = `${username}@users.workproof.app`;
       const { data: created, error: createError } = await admin.auth.admin.createUser({ email: syntheticEmail, password, email_confirm: true, user_metadata: { full_name: fullName, username, phone: body.phone || null, title: body.title || null, must_change_password: true }, app_metadata: { organisation_id: caller.organisation_id, role } });
       if (createError || !created.user) return reply({ error: createError?.message || "Could not create user" }, 400);
       const userId = created.user.id;

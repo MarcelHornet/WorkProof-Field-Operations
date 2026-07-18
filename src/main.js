@@ -1,4 +1,4 @@
-/* WorkProof production application — original interface with Supabase backend. */
+/* WorkProof production application with the original interface and Supabase backend. */
 
 import { supabase, configured } from "./supabase.js";
 
@@ -266,6 +266,21 @@ function saveData() {
   // UI state is refreshed from Supabase after every production mutation.
 }
 
+async function invokeSecureFunction(name, body) {
+  const { data: result, error } = await supabase.functions.invoke(name, { body });
+  if (!error && !result?.error) return result;
+  let message = result?.error || error?.message || "The request could not be completed.";
+  try {
+    if (error?.context instanceof Response) {
+      const details = await error.context.clone().json();
+      message = details?.error || details?.message || message;
+    }
+  } catch {
+    // Keep the standard message when the function did not return JSON.
+  }
+  throw new Error(message);
+}
+
 const dbToUiStatus = (status) => ({ in_progress: "in-progress", awaiting_review: "awaiting-review", rework: "rejected", closed: "completed" })[status] || status;
 const uiToDbStatus = (status) => ({ "in-progress": "in_progress", "awaiting-review": "awaiting_review", rejected: "rework", completed: "closed", overdue: "assigned" })[status] || status;
 const dbToUiRole = (role) => role === "team_lead" ? "lead" : role;
@@ -337,9 +352,9 @@ function getBusiness(id) { return data.businesses.find((b) => b.id === id); }
 function getProject(id) { return data.projects.find((p) => p.id === id); }
 
 function formatDate(value, options = {}) {
-  if (!value) return "—";
+  if (!value) return "Not set";
   const d = new Date(value.length === 10 ? `${value}T12:00:00` : value);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "Not set";
   return new Intl.DateTimeFormat("en-ZA", {
     day: "2-digit",
     month: options.short ? "short" : "long",
@@ -427,7 +442,7 @@ function canWorkTask(task) {
 }
 
 function taskLabel(task) {
-  return `Task ${task.taskNumber || "—"}`;
+  return `Task ${task.taskNumber || "Not set"}`;
 }
 
 function updateDerivedOverdueStatuses() {
@@ -615,7 +630,7 @@ function compactTask(task) {
   return `<button class="compact-task js-open-task" data-task-id="${task.id}" style="width:100%; background:transparent; border-left:0; border-right:0; border-bottom:0; text-align:left;">
     <div class="task-ref">${taskLabel(task)}</div>
     <div class="activity-copy"><strong>${escapeHtml(task.title)}</strong><span>${escapeHtml(site?.name || "No site")} · Due ${formatDate(task.dueDate, { short: true, year: false })}</span></div>
-    <div class="assignee"><div class="avatar ${avatarTone(assignee?.id)}">${assignee?.initials || "—"}</div><span class="badge ${status}">${statusLabel(status)}</span></div>
+    <div class="assignee"><div class="avatar ${avatarTone(assignee?.id)}">${assignee?.initials || "?"}</div><span class="badge ${status}">${statusLabel(status)}</span></div>
   </button>`;
 }
 
@@ -689,8 +704,8 @@ function taskRow(task) {
   return `<tr>
     <td><div class="task-title-cell"><div class="task-ref">${taskLabel(task)}</div><div><strong>${escapeHtml(task.title)}</strong><span>${escapeHtml(getProject(task.projectId)?.name || "General maintenance")}</span></div></div></td>
     <td><span class="badge ${status}">${statusLabel(status)}</span></td>
-    <td>${escapeHtml(site?.name || "—")}</td>
-    <td><div class="assignee"><div class="avatar ${avatarTone(assignee?.id)}">${assignee?.initials || "—"}</div><span>${escapeHtml(assignee?.name || getTeam(task.teamId)?.name || "Unassigned")}</span></div></td>
+    <td>${escapeHtml(site?.name || "Not set")}</td>
+    <td><div class="assignee"><div class="avatar ${avatarTone(assignee?.id)}">${assignee?.initials || "?"}</div><span>${escapeHtml(assignee?.name || getTeam(task.teamId)?.name || "Unassigned")}</span></div></td>
     <td><span class="badge ${task.priority}">${escapeHtml(task.priority)}</span></td>
     <td><strong>${formatDate(task.dueDate, { short: true })}</strong>${isOverdue(task) ? `<div class="tiny" style="color:var(--danger); margin-top:3px;">Overdue</div>` : ""}</td>
     <td><div class="task-row-actions"><button class="icon-btn subtle js-open-task" data-task-id="${task.id}" aria-label="Open task">${icons.eye}</button></div></td>
@@ -703,8 +718,8 @@ function taskMobileCard(task) {
   return `<button class="task-card-mobile js-open-task" data-task-id="${task.id}" style="width:100%; background:white; border:0; text-align:left;">
     <div class="row-between"><span class="task-ref">${taskLabel(task)}</span><span class="badge ${status}">${statusLabel(status)}</span></div>
     <h3 style="font-size:15px; margin:12px 0 7px;">${escapeHtml(task.title)}</h3>
-    <div class="muted small">${escapeHtml(getSite(task.siteId)?.name || "—")}</div>
-    <div class="row-between mt-16"><div class="assignee"><div class="avatar ${avatarTone(assignee?.id)}">${assignee?.initials || "—"}</div><span class="small">${escapeHtml(assignee?.name || "Unassigned")}</span></div><strong class="small">${formatDate(task.dueDate, { short: true, year: false })}</strong></div>
+    <div class="muted small">${escapeHtml(getSite(task.siteId)?.name || "Not set")}</div>
+    <div class="row-between mt-16"><div class="assignee"><div class="avatar ${avatarTone(assignee?.id)}">${assignee?.initials || "?"}</div><span class="small">${escapeHtml(assignee?.name || "Unassigned")}</span></div><strong class="small">${formatDate(task.dueDate, { short: true, year: false })}</strong></div>
   </button>`;
 }
 
@@ -717,7 +732,7 @@ function renderProjects() {
     return `<div class="card entity-card">
       <div class="row-between"><span class="entity-icon">${icons.projects}</span><span class="badge ${project.status === "active" ? "in-progress" : "approved"}">${project.status}</span></div>
       <h3>${escapeHtml(project.name)}</h3>
-      <p>${escapeHtml(getSite(project.siteId)?.name || "No site")} · Managed by ${escapeHtml(getUser(project.managerId)?.name || "—")}</p>
+      <p>${escapeHtml(getSite(project.siteId)?.name || "No site")} · Managed by ${escapeHtml(getUser(project.managerId)?.name || "Not set")}</p>
       <div class="mt-16"><div class="row-between small"><span class="muted">Completion</span><strong>${completion}%</strong></div><div class="mini-progress mt-16" style="margin-top:7px;"><span style="width:${completion}%"></span></div></div>
       <div class="entity-stats"><div><strong>${tasks.length}</strong><span>Tasks</span></div><div><strong>${tasks.filter(isOverdue).length}</strong><span>Overdue</span></div><div><strong>R${Math.round(project.budget / 1000)}k</strong><span>Budget</span></div></div>
     </div>`;
@@ -742,7 +757,10 @@ function visibleSites() {
 
 function renderSites() {
   const sites = visibleSites();
-  return `<div class="grid grid-3">${sites.map((site) => {
+  const addButton = currentUser()?.role === "owner" ? `<button class="btn btn-primary js-add-site">${icons.plus} Add site or property</button>` : "";
+  return `<div class="stack">
+    <div class="row-between page-heading-row"><div><h2 style="margin:0;font-size:22px;">Sites and properties</h2><p class="muted small">The operating locations connected to this workspace.</p></div>${addButton}</div>
+    ${sites.length ? `<div class="grid grid-3">${sites.map((site) => {
     const tasks = visibleTasks().filter((t) => t.siteId === site.id);
     return `<div class="card entity-card">
       <div class="site-banner"><span>${icons.building}</span><span class="tiny">${escapeHtml(getBusiness(site.businessId)?.code || "SITE")}</span></div>
@@ -750,7 +768,7 @@ function renderSites() {
       <p>${escapeHtml(site.location)}<br>${escapeHtml(getBusiness(site.businessId)?.name || "")}</p>
       <div class="entity-stats"><div><strong>${tasks.filter(t => !["approved","completed"].includes(t.status)).length}</strong><span>Open</span></div><div><strong>${tasks.filter(isOverdue).length}</strong><span>Overdue</span></div><div><strong>${tasks.filter(t => t.status === "awaiting-review").length}</strong><span>Review</span></div></div>
     </div>`;
-  }).join("")}</div>`;
+  }).join("")}</div>` : emptyState("sites", "No sites yet", "Add the first site or property to start assigning work.", addButton)}</div>`;
 }
 
 function visibleTeams() {
@@ -768,7 +786,7 @@ function renderTeams() {
     const completion = tasks.length ? Math.round(tasks.filter((t) => ["approved", "completed"].includes(t.status)).length / tasks.length * 100) : 0;
     return `<div class="card entity-card">
       <div class="row-between"><span class="entity-icon">${icons.teams}</span><span class="badge ${tasks.filter(isOverdue).length ? "overdue" : "approved"}">${tasks.filter(isOverdue).length ? `${tasks.filter(isOverdue).length} overdue` : "On track"}</span></div>
-      <h3>${escapeHtml(team.name)}</h3><p>${escapeHtml(team.trade)} · Manager: ${escapeHtml(getUser(team.managerId)?.name || "—")}</p>
+      <h3>${escapeHtml(team.name)}</h3><p>${escapeHtml(team.trade)} · Manager: ${escapeHtml(getUser(team.managerId)?.name || "Not set")}</p>
       <div class="team-member-stack">${members.map((m, i) => `<div class="avatar ${["orange","green","blue","purple"][i % 4]}" title="${escapeHtml(m.name)}">${m.initials}</div>`).join("")}</div>
       <div class="entity-stats"><div><strong>${members.length}</strong><span>Members</span></div><div><strong>${tasks.filter(t => !["approved","completed"].includes(t.status)).length}</strong><span>Open tasks</span></div><div><strong>${completion}%</strong><span>Completed</span></div></div>
     </div>`;
@@ -839,7 +857,7 @@ function renderSettings() {
       <div class="row mt-24"><span class="badge approved">Live production workspace</span></div>
     </div>
     <div class="card card-pad"><div class="row-between"><div><div class="eyebrow">SECURITY MODEL</div><h3>Role-based access</h3></div><span class="entity-icon">${icons.shield}</span></div><p class="muted small" style="line-height:1.7;">Secure username, cellphone or email sign-in with database-enforced owner, manager, team-leader and worker permissions. Evidence is stored privately and revoked users immediately lose workspace access.</p></div>
-    <div class="card span-2"><div class="card-header"><div><h3>People and access</h3><p>Current users visible in this workspace.</p></div>${["owner","manager"].includes(user.role) ? `<button class="btn btn-secondary btn-sm js-add-user">${icons.users} Add user</button>` : ""}</div><div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Team</th><th>Phone</th><th>Status</th><th></th></tr></thead><tbody>${users.map((u) => `<tr><td><div class="assignee"><div class="avatar ${avatarTone(u.id)}">${u.initials}</div><strong>${escapeHtml(u.name)}</strong></div></td><td>${escapeHtml(u.username||"—")}</td><td>${escapeHtml(roleLabel(u.role))}</td><td>${escapeHtml(getTeam(u.teamId)?.name || "Group level")}</td><td>${escapeHtml(u.phone||"—")}</td><td><span class="badge ${u.active ? "approved" : "draft"}">${u.active ? "Active" : "Revoked"}</span></td><td>${u.id!==user.id && (user.role==="owner"||["lead","worker"].includes(u.role))?`<button class="btn btn-ghost btn-sm js-toggle-user" data-user-id="${u.id}" data-active="${u.active}">${u.active?"Revoke":"Reactivate"}</button>`:""}</td></tr>`).join("")}</tbody></table></div></div>
+    <div class="card span-2"><div class="card-header"><div><h3>People and access</h3><p>Current users visible in this workspace.</p></div>${["owner","manager"].includes(user.role) ? `<button class="btn btn-secondary btn-sm js-add-user">${icons.users} Add user</button>` : ""}</div><div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Team</th><th>Phone</th><th>Status</th><th></th></tr></thead><tbody>${users.map((u) => `<tr><td><div class="assignee"><div class="avatar ${avatarTone(u.id)}">${u.initials}</div><strong>${escapeHtml(u.name)}</strong></div></td><td>${escapeHtml(u.username||"Not set")}</td><td>${escapeHtml(roleLabel(u.role))}</td><td>${escapeHtml(getTeam(u.teamId)?.name || "Group level")}</td><td>${escapeHtml(u.phone||"Not set")}</td><td><span class="badge ${u.active ? "approved" : "draft"}">${u.active ? "Active" : "Revoked"}</span></td><td>${u.id!==user.id && (user.role==="owner"||["lead","worker"].includes(u.role))?`<button class="btn btn-ghost btn-sm js-toggle-user" data-user-id="${u.id}" data-active="${u.active}">${u.active?"Revoke":"Reactivate"}</button>`:""}</td></tr>`).join("")}</tbody></table></div></div>
   </div>`;
 }
 
@@ -858,13 +876,32 @@ function bindPageEvents() {
   document.querySelector(".js-export-report")?.addEventListener("click", exportReportCsv);
   document.querySelector(".js-reset-demo")?.addEventListener("click", showResetModal);
   document.querySelector(".js-add-user")?.addEventListener("click", showAddUserModal);
+  document.querySelectorAll(".js-add-site").forEach((button) => button.addEventListener("click", showAddSiteModal));
   document.querySelectorAll(".js-toggle-user").forEach((button)=>button.addEventListener("click",async()=>{
     const active=button.dataset.active==="true"; let password=null;
     if(!active){password=prompt("Set a new temporary password (minimum 8 characters)");if(!password)return;}
     if(active&&!confirm("Revoke this user's access immediately?"))return;
-    const {data:result,error}=await supabase.functions.invoke("workproof-user-admin",{body:{action:active?"revoke":"reactivate",user_id:button.dataset.userId,password}});
-    if(error||result?.error)return toast(result?.error||error.message,"danger"); await refreshBackend(active?"User access revoked.":"User reactivated.");
+    try {
+      await invokeSecureFunction("workproof-user-admin", { action:active?"revoke":"reactivate", user_id:button.dataset.userId, password });
+      await refreshBackend(active?"User access revoked.":"User reactivated.");
+    } catch (error) { toast(error.message, "danger"); }
   }));
+}
+
+function showAddSiteModal() {
+  if (currentUser()?.role !== "owner") return toast("Only owners can add sites or properties.", "danger");
+  openModal(`<div class="modal-header"><div><div class="eyebrow">OPERATING LOCATION</div><h2>Add a site or property</h2></div><button class="icon-btn subtle js-close-modal">${icons.close}</button></div><form id="add-site-form"><div class="modal-body"><div class="form-grid"><div class="form-group full"><label>Site or property name</label><input class="input" name="name" required maxlength="120" placeholder="Example: AutoCity Heidelberg"></div><div class="form-group"><label>Business</label><select class="input" name="businessId" required><option value="">Select a business</option>${data.businesses.map((business)=>`<option value="${business.id}">${escapeHtml(business.name)}</option>`).join("")}</select></div><div class="form-group"><label>Manager (optional)</label><select class="input" name="managerId"><option value="">No manager yet</option>${data.users.filter((user)=>user.role==="manager"&&user.active).map((manager)=>`<option value="${manager.id}">${escapeHtml(manager.name)}</option>`).join("")}</select></div><div class="form-group full"><label>Address or area</label><input class="input" name="address" maxlength="240" placeholder="Example: Heidelberg, Gauteng"></div></div><p class="form-hint" style="margin-top:14px;">Sites remain in the audit history and cannot be deleted from WorkProof.</p></div><div class="modal-footer"><button type="button" class="btn btn-secondary js-close-modal">Cancel</button><button type="submit" class="btn btn-primary">Add site</button></div></form>`);
+  document.getElementById("add-site-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const submit = event.currentTarget.querySelector("button[type=submit]");
+    submit.disabled = true;
+    submit.textContent = "Adding site...";
+    const { error } = await supabase.from("sites").insert({ organisation_id:data.workspace.organisationId, business_id:form.get("businessId"), name:form.get("name").trim(), address:form.get("address").trim()||null, manager_id:form.get("managerId")||null });
+    if (error) { submit.disabled=false; submit.textContent="Add site"; return toast(error.message,"danger"); }
+    closeModal();
+    await refreshBackend("Site added successfully.");
+  });
 }
 
 function avatarTone(id = "") {
@@ -977,11 +1014,11 @@ function showTaskDetail(taskId) {
         </div>
         <div class="stack">
           <div class="detail-section"><h3>Task details</h3><div class="detail-meta">
-            <div class="meta-item"><span>Business</span><strong>${escapeHtml(getBusiness(task.businessId)?.name || "—")}</strong></div>
-            <div class="meta-item"><span>Site</span><strong>${escapeHtml(getSite(task.siteId)?.name || "—")}</strong></div>
-            <div class="meta-item"><span>Manager</span><strong>${escapeHtml(getUser(task.managerId)?.name || "—")}</strong></div>
+            <div class="meta-item"><span>Business</span><strong>${escapeHtml(getBusiness(task.businessId)?.name || "Not set")}</strong></div>
+            <div class="meta-item"><span>Site</span><strong>${escapeHtml(getSite(task.siteId)?.name || "Not set")}</strong></div>
+            <div class="meta-item"><span>Manager</span><strong>${escapeHtml(getUser(task.managerId)?.name || "Not set")}</strong></div>
             <div class="meta-item"><span>Due date</span><strong>${formatDate(task.dueDate, { short: true })}</strong></div>
-            <div class="meta-item"><span>Team</span><strong>${escapeHtml(team?.name || "—")}</strong></div>
+            <div class="meta-item"><span>Team</span><strong>${escapeHtml(team?.name || "Not set")}</strong></div>
             <div class="meta-item"><span>Assignee</span><strong>${escapeHtml(assignee?.name || "Team assignment")}</strong></div>
           </div></div>
           <div class="detail-section"><h3>Required proof</h3><div class="stack" style="gap:9px;">${(task.requiredEvidence || []).map((type) => {
@@ -1075,16 +1112,20 @@ function showUploadModal(taskId) {
       <div class="modal-body"><div class="form-grid">
         <div class="form-group"><label>Evidence type</label><select class="input" name="type">${availableTypes.map((t) => `<option value="${t}">${escapeHtml(t.replace("-", " "))}</option>`).join("")}</select></div>
         <div class="form-group"><label>Short note</label><input class="input" name="note" placeholder="What does this proof show?" /></div>
-        <div class="form-group full"><div class="upload-zone"><label for="proof-file"><span class="entity-icon">${icons.camera}</span><strong>Take or select a photo</strong><p class="muted small">Images are compressed before being saved in this demo.</p></label><input id="proof-file" type="file" name="file" accept="image/*" capture="environment" required /></div><div id="file-name" class="small muted" style="margin-top:8px;"></div></div>
+        <div class="form-group full"><label>Add a photo</label><div class="photo-source-grid"><label class="photo-source" for="proof-camera"><span class="entity-icon">${icons.camera}</span><strong>Take photo</strong><span>Open your phone camera</span></label><input id="proof-camera" class="visually-hidden proof-file-input" type="file" accept="image/*" capture="environment" /><label class="photo-source" for="proof-gallery"><span class="entity-icon">${icons.upload}</span><strong>Choose photo</strong><span>Select from your gallery</span></label><input id="proof-gallery" class="visually-hidden proof-file-input" type="file" accept="image/*" /></div><div id="file-name" class="small muted selected-file-name">No photo selected</div></div>
       </div></div>
       <div class="modal-footer"><button type="button" class="btn btn-secondary js-close-modal">Cancel</button><button type="submit" class="btn btn-primary">${icons.upload} Save proof</button></div>
     </form>
   `);
-  document.getElementById("proof-file").addEventListener("change", (e) => document.getElementById("file-name").textContent = e.target.files[0]?.name || "");
+  let selectedFile = null;
+  document.querySelectorAll(".proof-file-input").forEach((input) => input.addEventListener("change", (event) => {
+    selectedFile = event.target.files[0] || null;
+    document.getElementById("file-name").textContent = selectedFile ? `Selected: ${selectedFile.name}` : "No photo selected";
+  }));
   document.getElementById("upload-proof-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const file = form.get("file");
+    const file = selectedFile;
     if (!(file instanceof File) || !file.size) return toast("Select a photograph first.", "danger");
     const submit = event.currentTarget.querySelector("button[type=submit]");
     submit.disabled = true; submit.textContent = "Processing photo…";
@@ -1173,8 +1214,18 @@ function showAddUserModal() {
   document.getElementById("add-user-form").addEventListener("submit", async (event) => {
     event.preventDefault(); const form=new FormData(event.currentTarget); const role=uiToDbRole(form.get("role"));
     const body={action:"create",full_name:form.get("name").trim(),username:form.get("username").trim(),phone:form.get("phone").trim()||null,password:form.get("password"),role,team_id:form.get("teamId")||null,title:roleLabel(form.get("role"))};
-    const {data:result,error}=await supabase.functions.invoke("workproof-user-admin",{body});
-    if(error||result?.error)return toast(result?.error||error.message,"danger"); closeModal(); await refreshBackend(`${body.full_name} created as ${result.username}.`);
+    const submit = event.currentTarget.querySelector("button[type=submit]");
+    submit.disabled = true;
+    submit.textContent = "Creating account...";
+    try {
+      const result = await invokeSecureFunction("workproof-user-admin", body);
+      closeModal();
+      await refreshBackend(`${body.full_name} created as ${result.username}.`);
+    } catch (error) {
+      submit.disabled = false;
+      submit.textContent = "Create account";
+      toast(error.message, "danger");
+    }
   });
 }
 

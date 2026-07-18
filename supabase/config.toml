@@ -1,0 +1,9 @@
+[functions.workproof-login]
+verify_jwt = false
+
+[functions.workproof-user-admin]
+# This function validates the signed-in user's access token and organisation role itself.
+verify_jwt = false
+
+[functions.workproof-delete-task]
+verify_jwt = true
