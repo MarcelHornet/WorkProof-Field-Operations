@@ -287,6 +287,10 @@ select.input.filter-select { width: auto; min-width: 150px; padding: 10px 38px 1
 .form-group.full { grid-column: 1 / -1; }
 .form-group label { font-size: 12px; font-weight: 800; }
 .form-hint { font-size: 10px; color: var(--muted); }
+.password-input-wrap { position: relative; }
+.password-input-wrap .input { width: 100%; padding-right: 68px; }
+.password-visibility { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); min-width: 52px; min-height: 34px; border: 0; border-radius: 9px; background: #f3f4f6; color: var(--ink); font-size: 12px; font-weight: 800; }
+.password-visibility:hover { background: #e5e7eb; }
 .check-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
 .check-tile { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 9px; cursor: pointer; }
 .check-tile:has(input:checked) { border-color: var(--accent); background: var(--warning-bg); }
