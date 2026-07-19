@@ -725,7 +725,10 @@ function taskMobileCard(task) {
 
 function renderProjects() {
   const projects = visibleProjects();
-  return `<div class="grid grid-3">${projects.map((project) => {
+  const addButton = currentUser()?.role === "owner" ? `<button class="btn btn-primary js-add-project">${icons.plus} Add project</button>` : "";
+  return `<div class="stack">
+    <div class="row-between page-heading-row"><div><h2 style="margin:0;font-size:22px;">Projects</h2><p class="muted small">Construction, renovation and maintenance programmes.</p></div>${addButton}</div>
+    ${projects.length ? `<div class="grid grid-3">${projects.map((project) => {
     const tasks = visibleTasks().filter((t) => t.projectId === project.id);
     const completed = tasks.filter((t) => ["approved", "completed"].includes(t.status)).length;
     const completion = tasks.length ? Math.round(completed / tasks.length * 100) : 0;
@@ -736,7 +739,7 @@ function renderProjects() {
       <div class="mt-16"><div class="row-between small"><span class="muted">Completion</span><strong>${completion}%</strong></div><div class="mini-progress mt-16" style="margin-top:7px;"><span style="width:${completion}%"></span></div></div>
       <div class="entity-stats"><div><strong>${tasks.length}</strong><span>Tasks</span></div><div><strong>${tasks.filter(isOverdue).length}</strong><span>Overdue</span></div><div><strong>R${Math.round(project.budget / 1000)}k</strong><span>Budget</span></div></div>
     </div>`;
-  }).join("")}</div>`;
+  }).join("")}</div>` : emptyState("projects", "No projects yet", "Add the first project to organise related work.", addButton)}</div>`;
 }
 
 function visibleProjects() {
@@ -780,7 +783,10 @@ function visibleTeams() {
 
 function renderTeams() {
   const teams = visibleTeams();
-  return `<div class="grid grid-3">${teams.map((team) => {
+  const addButton = currentUser()?.role === "owner" ? `<button class="btn btn-primary js-add-team">${icons.plus} Add team</button>` : "";
+  return `<div class="stack">
+    <div class="row-between page-heading-row"><div><h2 style="margin:0;font-size:22px;">Teams</h2><p class="muted small">Work crews, trades and responsible managers.</p></div>${addButton}</div>
+    ${teams.length ? `<div class="grid grid-3">${teams.map((team) => {
     const members = team.memberIds.map(getUser).filter(Boolean);
     const tasks = visibleTasks().filter((t) => t.teamId === team.id);
     const completion = tasks.length ? Math.round(tasks.filter((t) => ["approved", "completed"].includes(t.status)).length / tasks.length * 100) : 0;
@@ -790,7 +796,7 @@ function renderTeams() {
       <div class="team-member-stack">${members.map((m, i) => `<div class="avatar ${["orange","green","blue","purple"][i % 4]}" title="${escapeHtml(m.name)}">${m.initials}</div>`).join("")}</div>
       <div class="entity-stats"><div><strong>${members.length}</strong><span>Members</span></div><div><strong>${tasks.filter(t => !["approved","completed"].includes(t.status)).length}</strong><span>Open tasks</span></div><div><strong>${completion}%</strong><span>Completed</span></div></div>
     </div>`;
-  }).join("")}</div>`;
+  }).join("")}</div>` : emptyState("teams", "No teams yet", "Add the first team and assign its manager.", addButton)}</div>`;
 }
 
 function renderReports() {
@@ -877,6 +883,8 @@ function bindPageEvents() {
   document.querySelector(".js-reset-demo")?.addEventListener("click", showResetModal);
   document.querySelector(".js-add-user")?.addEventListener("click", showAddUserModal);
   document.querySelectorAll(".js-add-site").forEach((button) => button.addEventListener("click", showAddSiteModal));
+  document.querySelectorAll(".js-add-team").forEach((button) => button.addEventListener("click", showAddTeamModal));
+  document.querySelectorAll(".js-add-project").forEach((button) => button.addEventListener("click", showAddProjectModal));
   document.querySelectorAll(".js-toggle-user").forEach((button)=>button.addEventListener("click",async()=>{
     const active=button.dataset.active==="true"; let password=null;
     if(!active){password=prompt("Set a new temporary password (minimum 8 characters)");if(!password)return;}
@@ -901,6 +909,50 @@ function showAddSiteModal() {
     if (error) { submit.disabled=false; submit.textContent="Add site"; return toast(error.message,"danger"); }
     closeModal();
     await refreshBackend("Site added successfully.");
+  });
+}
+
+function showAddTeamModal() {
+  if (currentUser()?.role !== "owner") return toast("Only owners can add teams.", "danger");
+  const managers = data.users.filter((user) => user.role === "manager" && user.active);
+  openModal(`<div class="modal-header"><div><div class="eyebrow">NEW WORK CREW</div><h2>Add a team</h2></div><button class="icon-btn subtle js-close-modal">${icons.close}</button></div><form id="add-team-form"><div class="modal-body"><div class="form-grid"><div class="form-group full"><label>Team name</label><input class="input" name="name" maxlength="120" required placeholder="Example: Maintenance Team Bravo"></div><div class="form-group"><label>Trade or function</label><input class="input" name="trade" maxlength="120" required placeholder="Example: General maintenance"></div><div class="form-group"><label>Responsible manager</label><select class="input" name="managerId"><option value="">Assign later</option>${managers.map((manager)=>`<option value="${manager.id}">${escapeHtml(manager.name)}</option>`).join("")}</select></div><div class="form-group full"><label>Description (optional)</label><textarea class="input" name="description" maxlength="500" placeholder="Describe the type of work this team performs."></textarea></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary js-close-modal">Cancel</button><button type="submit" class="btn btn-primary">Add team</button></div></form>`);
+  document.getElementById("add-team-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const submit = event.currentTarget.querySelector("button[type=submit]");
+    submit.disabled = true;
+    submit.textContent = "Adding team...";
+    const { error } = await supabase.from("teams").insert({ organisation_id:data.workspace.organisationId, name:form.get("name").trim(), trade:form.get("trade").trim(), description:form.get("description").trim()||null, manager_id:form.get("managerId")||null, active:true });
+    if (error) { submit.disabled=false; submit.textContent="Add team"; return toast(error.message,"danger"); }
+    closeModal();
+    await refreshBackend("Team added successfully.");
+  });
+}
+
+function showAddProjectModal() {
+  if (currentUser()?.role !== "owner") return toast("Only owners can add projects.", "danger");
+  const managers = data.users.filter((user) => user.role === "manager" && user.active);
+  openModal(`<div class="modal-header"><div><div class="eyebrow">NEW PROJECT</div><h2>Add a project</h2></div><button class="icon-btn subtle js-close-modal">${icons.close}</button></div><form id="add-project-form"><div class="modal-body"><div class="form-grid"><div class="form-group full"><label>Project name</label><input class="input" name="name" maxlength="160" required placeholder="Example: Heidelberg Workshop Upgrade"></div><div class="form-group"><label>Business</label><select id="project-business" class="input" name="businessId" required><option value="">Select a business</option>${data.businesses.map((business)=>`<option value="${business.id}">${escapeHtml(business.name)}</option>`).join("")}</select></div><div class="form-group"><label>Site or property</label><select id="project-site" class="input" name="siteId" required><option value="">Select a business first</option></select></div><div class="form-group"><label>Responsible manager</label><select class="input" name="managerId"><option value="">Assign later</option>${managers.map((manager)=>`<option value="${manager.id}">${escapeHtml(manager.name)}</option>`).join("")}</select></div><div class="form-group"><label>Budget (optional)</label><input class="input" type="number" name="budget" min="0" step="0.01" value="0" inputmode="decimal"></div><div class="form-group"><label>Start date</label><input id="project-start-date" class="input" type="date" name="startDate"></div><div class="form-group"><label>End date</label><input id="project-end-date" class="input" type="date" name="endDate"></div><div class="form-group full"><label>Description (optional)</label><textarea class="input" name="description" maxlength="1000" placeholder="Describe the purpose and expected result."></textarea></div></div></div><div class="modal-footer"><button type="button" class="btn btn-secondary js-close-modal">Cancel</button><button type="submit" class="btn btn-primary">Add project</button></div></form>`);
+  const businessSelect = document.getElementById("project-business");
+  const siteSelect = document.getElementById("project-site");
+  const renderProjectSites = () => {
+    const sites = data.sites.filter((site) => site.businessId === businessSelect.value);
+    siteSelect.innerHTML = `<option value="">${sites.length ? "Select a site" : "No sites for this business"}</option>${sites.map((site)=>`<option value="${site.id}">${escapeHtml(site.name)}</option>`).join("")}`;
+  };
+  businessSelect.addEventListener("change", renderProjectSites);
+  document.getElementById("add-project-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const startDate = form.get("startDate") || null;
+    const endDate = form.get("endDate") || null;
+    if (startDate && endDate && endDate < startDate) return toast("The end date cannot be before the start date.", "danger");
+    const submit = event.currentTarget.querySelector("button[type=submit]");
+    submit.disabled = true;
+    submit.textContent = "Adding project...";
+    const { error } = await supabase.from("projects").insert({ organisation_id:data.workspace.organisationId, business_id:form.get("businessId"), site_id:form.get("siteId"), manager_id:form.get("managerId")||null, name:form.get("name").trim(), description:form.get("description").trim()||null, start_date:startDate, end_date:endDate, budget:Number(form.get("budget")||0), active:true });
+    if (error) { submit.disabled=false; submit.textContent="Add project"; return toast(error.message,"danger"); }
+    closeModal();
+    await refreshBackend("Project added successfully.");
   });
 }
 
